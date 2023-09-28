@@ -109,6 +109,7 @@ public interface NettyPipeline {
 	String OnChannelReadIdle     = LEFT + "onChannelReadIdle";
 	String OnChannelWriteIdle    = LEFT + "onChannelWriteIdle";
 	String ProxyHandler          = LEFT + "proxyHandler";
+	String ProxySslHandler       = LEFT + "proxySslHandler";
 	/**
 	 * Use to register a special handler which ensures that any {@link io.netty.channel.VoidChannelPromise}
 	 * will be converted to "unvoided" promises.
@@ -119,6 +120,7 @@ public interface NettyPipeline {
 	@Deprecated
 	String UnvoidHandler         = LEFT + "unvoidHandler";
 	String ProxyLoggingHandler   = LEFT + "proxyLoggingHandler";
+	String ProxySslLoggingHandler = LEFT + "proxySslLoggingHandler";
 	String ProxyProtocolDecoder  = LEFT + "proxyProtocolDecoder";
 	String ProxyProtocolReader   = LEFT + "proxyProtocolReader";
 	String ReadTimeoutHandler    = LEFT + "readTimeoutHandler";
@@ -126,6 +128,7 @@ public interface NettyPipeline {
 	String SslHandler            = LEFT + "sslHandler";
 	String SslLoggingHandler     = LEFT + "sslLoggingHandler";
 	String SslReader             = LEFT + "sslReader";
+	String ProxySslReader        = LEFT + "proxySslReader";
 	String TlsMetricsHandler     = LEFT + "tlsMetricsHandler";
 	String WsCompressionHandler  = LEFT + "wsCompressionHandler";
 	String WsFrameAggregator     = LEFT + "wsFrameAggregator";

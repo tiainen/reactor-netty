@@ -719,6 +719,10 @@ public final class HttpClientConfig extends ClientTransportConfig<HttpClientConf
 		}
 	}
 
+	static void configureHttp11ProxySecure(Channel channel, SocketAddress remoteAddress, SslProvider proxySslProvider) {
+		proxySslProvider.addProxySslHandler(channel, remoteAddress, SSL_PROXY_DEBUG);
+	}
+
 	static final Pattern FOLLOW_REDIRECT_CODES = Pattern.compile("30[12378]");
 
 	static final BiPredicate<HttpClientRequest, HttpClientResponse> FOLLOW_REDIRECT_PREDICATE =
@@ -753,6 +757,12 @@ public final class HttpClientConfig extends ClientTransportConfig<HttpClientConf
 	 * fallback to SSL debugging disabled
 	 */
 	static final boolean SSL_DEBUG = Boolean.parseBoolean(System.getProperty(ReactorNetty.SSL_CLIENT_DEBUG, "false"));
+
+	/**
+	 * Default value whether the SSL debugging on the proxy client side will be enabled/disabled,
+	 * fallback to proxy SSL debugging disabled
+	 */
+	static final boolean SSL_PROXY_DEBUG = Boolean.parseBoolean(System.getProperty(ReactorNetty.SSL_PROXY_DEBUG, "false"));
 
 	static final class H2CleartextCodec extends ChannelHandlerAdapter {
 
@@ -934,6 +944,7 @@ public final class HttpClientConfig extends ClientTransportConfig<HttpClientConf
 		final int                                        protocols;
 		final SslProvider                                sslProvider;
 		final Function<String, String>                   uriTagValue;
+		final ProxyProvider                              proxyProvider;
 
 		HttpClientChannelInitializer(HttpClientConfig config) {
 			this.acceptGzip = config.acceptGzip;
@@ -944,6 +955,7 @@ public final class HttpClientConfig extends ClientTransportConfig<HttpClientConf
 			this.protocols = config._protocols;
 			this.sslProvider = config.sslProvider;
 			this.uriTagValue = config.uriTagValue;
+			this.proxyProvider = config.proxyProvider();
 		}
 
 		@Override
@@ -973,6 +985,10 @@ public final class HttpClientConfig extends ClientTransportConfig<HttpClientConf
 				else if ((protocols & h2c) == h2c) {
 					configureHttp2Pipeline(channel.pipeline(), acceptGzip, decoder, http2Settings, observer);
 				}
+			}
+
+			if (proxyProvider != null && proxyProvider.shouldProxy(remoteAddress) && proxyProvider.getProxySslProvider() != null) {
+				configureHttp11ProxySecure(channel, remoteAddress, proxyProvider.getProxySslProvider());
 			}
 		}
 	}

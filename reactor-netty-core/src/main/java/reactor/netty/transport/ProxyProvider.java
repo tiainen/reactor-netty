@@ -26,6 +26,9 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -40,8 +43,11 @@ import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.ProxyHandler;
 import io.netty.handler.proxy.Socks4ProxyHandler;
 import io.netty.handler.proxy.Socks5ProxyHandler;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.util.internal.StringUtil;
 import reactor.netty.NettyPipeline;
+import reactor.netty.tcp.SslProvider;
 import reactor.netty.transport.logging.AdvancedByteBufFormat;
 import reactor.util.annotation.Nullable;
 
@@ -68,6 +74,7 @@ public final class ProxyProvider {
 	final Supplier<? extends HttpHeaders> httpHeaders;
 	final Proxy type;
 	final long connectTimeoutMillis;
+	final SslProvider proxySslProvider;
 
 	ProxyProvider(ProxyProvider.Build builder) {
 		this.username = builder.username;
@@ -87,6 +94,7 @@ public final class ProxyProvider {
 		this.httpHeaders = builder.httpHeaders;
 		this.type = builder.type;
 		this.connectTimeoutMillis = builder.connectTimeoutMillis;
+		this.proxySslProvider = builder.proxySslProvider;
 	}
 
 	/**
@@ -105,6 +113,16 @@ public final class ProxyProvider {
 	 */
 	public final Supplier<? extends InetSocketAddress> getAddress() {
 		return this.address;
+	}
+
+	/**
+	 * The proxy ssl provider in case the proxy is configured is secured mode.
+	 *
+	 * @return The proxy ssl provider if the proxy is configured in secured mode, else null.
+	 * @since 1.0.19
+	 */
+	public final SslProvider getProxySslProvider() {
+		return this.proxySslProvider;
 	}
 
 	/**
@@ -390,6 +408,17 @@ public final class ProxyProvider {
 		Supplier<? extends HttpHeaders> httpHeaders = NO_HTTP_HEADERS;
 		Proxy type;
 		long connectTimeoutMillis = 10000;
+		SslProvider proxySslProvider;
+
+		/**
+		 * Enables the hostname verification.
+		 */
+		static final Consumer<? super SslHandler> HOSTNAME_VERIFICATION_CONFIGURER = handler -> {
+			SSLEngine sslEngine = handler.engine();
+			SSLParameters sslParameters = sslEngine.getSSLParameters();
+			sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+			sslEngine.setSSLParameters(sslParameters);
+		};
 
 		Build() {
 		}
@@ -465,6 +494,16 @@ public final class ProxyProvider {
 		@Override
 		public Builder connectTimeoutMillis(long connectTimeoutMillis) {
 			this.connectTimeoutMillis = connectTimeoutMillis;
+			return this;
+		}
+
+		@Override
+		public final Builder secure(Consumer<? super SslProvider.SslContextSpec> proxySslProviderBuilder) {
+			Objects.requireNonNull(proxySslProviderBuilder, "proxySslProviderBuilder");
+			SslProvider.SslContextSpec builder = SslProvider.builder();
+			proxySslProviderBuilder.accept(builder);
+			SslProvider sslProvider = ((SslProvider.Builder) builder).build();
+			this.proxySslProvider = SslProvider.addHandlerConfigurator(sslProvider, HOSTNAME_VERIFICATION_CONFIGURER);
 			return this;
 		}
 
@@ -658,6 +697,22 @@ public final class ProxyProvider {
 		 * @return {@code this}
 		 */
 		Builder connectTimeoutMillis(long connectTimeoutMillis);
+
+		/**
+		 * Apply a proxy SSL configuration customization via the passed builder.
+		 * <p>The builder will produce the {@link SslContext} with:
+		 * <ul>
+		 *     <li>{@code 10} seconds handshake timeout unless the passed builder sets another configuration or
+		 *     the environment property {@code reactor.netty.tcp.sslHandshakeTimeout} is set</li>
+		 *     <li>hostname verification enabled</li>
+		 * </ul>
+		 * </p>
+		 *
+		 * @param proxySslProviderBuilder builder callback for further customization of the proxy SslContext.
+		 * @return {@code this}
+		 * @since 1.0.19
+		 */
+		Builder secure(Consumer<? super SslProvider.SslContextSpec> proxySslProviderBuilder);
 
 		/**
 		 * Builds new ProxyProvider
